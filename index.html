@@ -42,16 +42,18 @@ const st=()=>{const e=$('#st');e.className=S.dirty?'d':'';e.textContent=S.d?(S.f
 const prep=t=>{S.d=JSON.parse(t);S.d.items??=[];S.d.adventurers??=[];S.dirty=0;S.open=-1;S.raw=t;render()};
 async function load(){await perm(S.fh);const f=await S.fh.getFile();S.fn=f.name;prep(await f.text())}
 async function openMain(){try{if(FSA){[S.fh]=await showOpenFilePicker({id:'igm',types:[{description:'Save JSON',accept:{'application/json':['.json']}}]});kv('fh',S.fh);await load()}else{const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=async()=>{const f=i.files[0];if(f){S.fn=f.name;prep(await f.text())}};i.click()}}catch(e){if(e.name!='AbortError')toast(e.message,1)}}
-async function refresh(){if(S.dirty&&!confirm('Perubahan yang belum disimpan akan hilang. Lanjutkan?'))return;try{if(FSA&&S.fh){await load();toast('Dimuat ulang dari file')}else openMain()}catch(e){toast(e.message,1)}}
+const stale=e=>['NotReadableError','NotFoundError','InvalidStateError'].includes(e.name);
+async function refresh(){if(S.dirty&&!confirm('Perubahan yang belum disimpan akan hilang. Lanjutkan?'))return;try{if(FSA&&S.fh){await load();toast('Dimuat ulang dari file')}else openMain()}catch(e){if(stale(e)){toast('Akses file lama hilang, pilih file-nya lagi');S.fh=null;openMain()}else toast(e.message,1)}}
 async function pickBackup(){S.bh=await showSaveFilePicker({id:'igmb',suggestedName:'idleguild_save_backup.json',types:[{description:'Backup JSON',accept:{'application/json':['.json']}}]});kv('bh',S.bh)}
+const wr=async(h,t)=>{const w=await h.createWritable();await w.write(t);await w.close()};
 const dlf=(t,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'application/json'}));a.download=n;a.click()};
 async function save(){if(!S.d)return toast('Buka file dulu',1);try{const out=JSON.stringify(S.d);
 if(FSA&&S.fh){if(!S.bh){toast('Pilih lokasi file backup (sekali saja)');await pickBackup()}
 await perm(S.fh);await perm(S.bh);const disk=await(await S.fh.getFile()).text();
-let w=await S.bh.createWritable();await w.write(disk);await w.close();
-w=await S.fh.createWritable();await w.write(out);await w.close()}
+try{await wr(S.bh,disk)}catch(e){if(!stale(e))throw e;toast('Lokasi backup lama tidak valid, pilih ulang');await pickBackup();await wr(S.bh,disk)}
+await wr(S.fh,out)}
 else{dlf(S.raw,'idleguild_save_backup.json');dlf(out,S.fn)}
-S.raw=out;S.dirty=0;st();toast('Tersimpan. Backup diperbarui.')}catch(e){toast(e.name=='AbortError'?'Dibatalkan, belum disimpan':'Gagal: '+e.message,1)}}
+S.raw=out;S.dirty=0;st();toast('Tersimpan. Backup diperbarui.')}catch(e){toast(e.name=='AbortError'?'Dibatalkan, belum disimpan':stale(e)?'File asli tidak bisa diakses. Tekan Buka, pilih file lagi, lalu ulangi perubahan.':'Gagal: '+e.message,1)}}
 const num=(v,a)=>`<input type=number inputmode=numeric ${a} value="${v??0}">`;
 function vRes(){return['money','gems'].map(k=>`<div class=card><b>${k=='money'?'Uang':'Gem'} (${k})</b><div class=bar>${num(S.d[k],`data-p=${k}`)}${[1e3,1e6,1e9].map(n=>`<button data-x=add data-v="${k}:${n}">+${n>=1e9?'1B':n>=1e6?'1M':'1K'}</button>`).join('')}</div></div>`).join('')+'<p class=m>Nilai besar bisa merusak save. Naikkan bertahap.</p>'}
 function vItems(){const cats=[...new Set(CAT.i.map(x=>x.t))].sort(),c=S.cat;
@@ -78,7 +80,7 @@ else if(t.dataset.raw!=null){try{S.d.adventurers[t.dataset.raw]=JSON.parse(t.val
 document.addEventListener('input',e=>{if(e.target.id=='q'){S.q=e.target.value;clearTimeout(S.tm);S.tm=setTimeout(()=>{render();const i=$('#q');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)}});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-x]');if(!b)return;const k=b.dataset.x,v=b.dataset.v,A=S.d&&S.d.adventurers;
 if(k=='open')openMain();else if(k=='refresh')refresh();else if(k=='save')save();
-else if(k=='resume'){try{await load()}catch(x){toast(x.message,1)}}
+else if(k=='resume'){try{await load()}catch(x){if(stale(x)){toast('Akses file lama hilang, pilih file-nya lagi');S.fh=null;openMain()}else toast(x.message,1)}}
 else if(k=='tab'){S.tab=v;S.q='';render()}
 else if(!S.d)return;
 else if(k=='add'){const[f,n]=v.split(':');S.d[f]=Math.min(9e15,(S.d[f]||0)+ +n);dirty();render()}
