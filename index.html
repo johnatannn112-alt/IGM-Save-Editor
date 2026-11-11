@@ -70,15 +70,15 @@ function vPets(){const P=S.d.pets??(S.d.pets=[]);return `<div class=bar><button 
 
 const dirty=()=>{S.dirty=1;st()};
 const st=()=>{const e=$('#st');e.className=S.dirty?'d':'';e.textContent=S.d?(S.fn+(S.dirty?' - ada perubahan belum disimpan':' - tersimpan')+(FSA?'':' (mode unduh)')):'Belum ada file dibuka'};
-const prep=t=>{const parsed=JSON.parse(t);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('Format file save JSON tidak valid');S.d=parsed;S.d.items??=[];S.d.adventurers??=[];S.d.pets??=[];S.dirty=0;S.open=-1;S.raw=t;render()};
-async function load(){await perm(S.fh);const f=await S.fh.getFile();S.fn=f.name;prep(await f.text())}
+const prep=t=>{if(!t||!t.trim())throw Error('File kosong');const parsed=JSON.parse(t.replace(/^\uFEFF/,'').trim());if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('Format file save JSON tidak valid');S.d=parsed;S.d.items??=[];S.d.adventurers??=[];S.d.pets??=[];S.dirty=0;S.open=-1;S.raw=t;render()};
+async function load(){await perm(S.fh);const f=await S.fh.getFile();S.fn=f.name;const t=await f.text();if(t.length<1000)throw Error('File terlalu kecil, panjang: '+t.length);prep(t)}
 async function openMain(){try{if(FSA){[S.fh]=await showOpenFilePicker({id:'igm',types:[{description:'Save JSON',accept:{'application/json':['.json']}}]});kv('fh',S.fh);await load()}else{const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=async()=>{try{const f=i.files[0];if(f){S.fn=f.name;prep(await f.text())}}catch(err){toast('Gagal membuka file: '+err.message,1)}};i.click()}}catch(e){if(e.name!='AbortError')toast(e.message,1)}}
 const stale=e=>['NotReadableError','NotFoundError','InvalidStateError'].includes(e.name);
-async function refresh(){if(S.dirty&&!confirm('Perubahan yang belum disimpan akan hilang. Lanjutkan?'))return;try{if(FSA&&S.fh){await load();toast('Dimuat ulang dari file')}else openMain()}catch(e){if(stale(e)){toast('Akses file lama hilang, pilih file-nya lagi');S.fh=null;openMain()}else toast(e.message,1)}}
+async function refresh(){if(S.dirty&&!confirm('Perubahan yang belum disimpan akan hilang. Lanjutkan?'))return;try{if(FSA&&S.fh){await load();toast('Dimuat ulang dari file')}else openMain()}catch(e){if(stale(e)){toast('Akses file lama hilang, pilih file-nya lagi');S.fh=null;await kv('fh',null);openMain()}else toast(e.message,1)}}
 async function pickBackup(){S.bh=await showSaveFilePicker({id:'igmb',suggestedName:'idleguild_save_backup.json',types:[{description:'Backup JSON',accept:{'application/json':['.json']}}]});kv('bh',S.bh)}
-const wr=async(h,t)=>{const w=await h.createWritable();await w.write(t);await w.close()};
+const wr=async(h,t)=>{const w=await h.createWritable({keepExistingData:false});await w.write(t);await w.truncate(t.length);await w.close()};
 const dlf=(t,n)=>{const u=URL.createObjectURL(new Blob([t],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=n;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)};
-async function save(){if(!S.d)return toast('Buka file dulu',1);try{const out=JSON.stringify(S.d);
+async function save(){if(!S.d)return toast('Buka file dulu',1);try{const out=JSON.stringify(S.d,null,2);
 if(FSA&&S.fh){if(!S.bh){toast('Pilih lokasi file backup (sekali saja)');await pickBackup()}
 await perm(S.fh);await perm(S.bh);const disk=await(await S.fh.getFile()).text();
 try{await wr(S.bh,disk)}catch(e){if(!stale(e))throw e;toast('Lokasi backup lama tidak valid, pilih ulang');await pickBackup();await wr(S.bh,disk)}
@@ -122,7 +122,7 @@ else if(t.dataset.raw!=null){try{S.d.adventurers[t.dataset.raw]=JSON.parse(t.val
 document.addEventListener('input',e=>{if(e.target.id=='q'){S.q=e.target.value;clearTimeout(S.tm);S.tm=setTimeout(()=>{render();const i=$('#q');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)}});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-x]');if(!b)return;const k=b.dataset.x,v=b.dataset.v,A=S.d&&S.d.adventurers;
 if(k=='open')openMain();else if(k=='refresh')refresh();else if(k=='save')save();
-else if(k=='resume'){try{await load()}catch(x){if(stale(x)){toast('Akses file lama hilang, pilih file-nya lagi');S.fh=null;openMain()}else toast(x.message,1)}}
+else if(k=='resume'){try{await load()}catch(x){if(stale(x)){toast('Akses file lama hilang, pilih file-nya lagi');S.fh=null;await kv('fh',null);openMain()}else toast(x.message,1)}}
 else if(k=='tab'){S.tab=v;S.q='';render()}
 else if(!S.d)return;
 else if(k=='add'){const[f,n]=v.split(':');S.d[f]=Math.min(9e15,(S.d[f]||0)+ +n);dirty();render()}
