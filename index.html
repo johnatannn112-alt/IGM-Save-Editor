@@ -28,7 +28,7 @@ const S={det:'',d:null,fh:null,bh:null,dirty:0,tab:'res',q:'',cat:'',open:-1,fn:
 const FSA='showOpenFilePicker'in window&&'showSaveFilePicker'in window;
 const SL={weapon:['Dagger','Sword','Staff','Bow'],armor:['Heavy Armor','Medium Armor','Light Armor'],accessory:['Accessory']};
 const DOC=['EmptyDoctrine','DoctrineOfAffliction','DoctrineOfControl','DoctrineOfFortitude','DoctrineOfGrace','DoctrineOfIllusion','DoctrineOfKnowledge','DoctrineOfRuin','DoctrineOfWar'];
-const TABS=[['res','Sumber daya'],['items','Item'],['adv','Karakter'],['guild','Guild'],['json','JSON']];
+const TABS=[['res','Sumber daya'],['items','Item'],['adv','Karakter'],['pets','Pet'],['guild','Guild'],['json','JSON']];
 const toast=(m,e)=>{const t=$('#t');t.textContent=m;t.className=e?'e show':'show';clearTimeout(toast.i);toast.i=setTimeout(()=>t.className='',3800)};
 const db=()=>new Promise((r,j)=>{const q=indexedDB.open('igm',1);q.onupgradeneeded=()=>q.result.createObjectStore('k');q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error)});
 const kv=async(k,v)=>{try{const d=await db();return await new Promise((r,j)=>{const o=d.transaction('k',v===undefined?'readonly':'readwrite').objectStore('k'),q=v===undefined?o.get(k):o.put(v,k);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error)})}catch(e){return null}};
@@ -41,9 +41,47 @@ const det=c=>{const x=IN.get(c);return S.det!=c||!x?'':`<div class=card style="m
 const clsSel=(v,i)=>{const c=AN.get(v),o=x=>`<option value="${x}"${x==v?' selected':''}>${esc(nm(x))} (T${(AN.get(x)||{}).t||'?'})</option>`,g=(l,r)=>r&&r.length?`<optgroup label="${l}">${r.map(o).join('')}</optgroup>`:'';
 return`<select data-a="${i}|trueClass">${c&&!S.allc?g('Tier sebelumnya',c.p)+g('Class sekarang',[v])+g('Tier selanjutnya',c.x):`<optgroup label="Semua class">${CAT.a.map(x=>o(x.c)).join('')}</optgroup>`}${c||!v?'':`<option selected>${esc(v)}</option>`}</select><label class=m style="font-size:12px"><input type=checkbox data-all=1${S.allc?' checked':''}> tampilkan semua class</label>`};
 const slotSel=(k,a,i)=>{const c=a[k]?.trueClass;return`<select data-slot=1 data-a="${i}|${k}"><option value="">- kosong -</option>${c&&!IN.has(c)?`<option value="${esc(c)}" selected>${esc(c)}</option>`:''}${SL[k].map(t=>`<optgroup label="${t}">${CAT.i.filter(x=>x.t==t).map(x=>`<option value="${x.c}"${x.c==c?' selected':''}>${esc(x.n)}</option>`).join('')}</optgroup>`).join('')}</select>`};
+
+const COMMON_TRAITS=['BRUTE','BRUTE_PLUS','BOOKWORM','BOOKWORM_PLUS','FERAL','FERAL_PLUS'];
+const PET_SPECIES={
+ Wild:['Rat','RedWolf','Squirrtel'],
+ Wooden:['FloatingSeed','HolyTree','WalkingBush'],
+ Insect:['Tarantula','Mosquito','Beetle'],
+ Avian:['Eagle','Owl'],
+ Esoteric:['FloatingEye','TentacleTangle','ThingFromTheAbyss'],
+ Construct:['Golem','Rockling','Tesseract'],
+ Reptile:['Lizard','Crocodile']
+};
+const PET_FIXED={Wild:'BLOODTHIRSTY',Wooden:'HEALER',Insect:'FIGHTER',Avian:'DECOY',Esoteric:'CURIOUS',Construct:'BRIGHT',Reptile:'OPPORTUNIST'};
+const PET_ABILITIES=['CURIOUS','TEACHER','BLOODTHIRSTY','HEALER','SOOTHING','FIGHTER','BRIGHT','DECOY','SAVAGE','OPPORTUNIST','VIGILANT','PROTECTIVE','MAGIC','BARRIER','COUNTERATTACK'];
+const PET_LABEL={CURIOUS:'Curious',TEACHER:'Teacher',BLOODTHIRSTY:'Bloodthirsty',HEALER:'Healer',SOOTHING:'Soothing',FIGHTER:'Fighter',BRIGHT:'Bright',DECOY:'Decoy',SAVAGE:'Savage',OPPORTUNIST:'Opportunist',VIGILANT:'Vigilant',PROTECTIVE:'Protective',MAGIC:'Magic',BARRIER:'Barrier',COUNTERATTACK:'Counterattack'};
+const petType=c=>Object.keys(PET_SPECIES).find(k=>PET_SPECIES[k].includes(c))||'Wild';
+const petSpeciesLabel=c=>c.replace(/([a-z])([A-Z])/g,'$1 $2');
+const petAbilityLabel=c=>PET_LABEL[c]||c||'-';
+const petSelect=(value,opts,attr,disabled=false)=>`<select ${attr}${disabled?' disabled':''}>${opts.map(x=>{const v=typeof x==='string'?x:x.v,l=typeof x==='string'?x:x.l;return `<option value="${esc(v)}"${v===value?' selected':''}>${esc(l)}</option>`}).join('')}</select>`;
+function traitSelect(a,i){const opts=[...new Set([...COMMON_TRAITS,a.traitCommon].filter(Boolean))];return petSelect(a.traitCommon,opts.map(x=>({v:x,l:x.replace(/_/g,' ')})),`data-a="${i}|traitCommon"`)}
+function petForm(p,i){
+ const type=petType(p.trueClass),fixed=PET_FIXED[type],unlocked=[1,21,41,61];
+ const species=Object.entries(PET_SPECIES).map(([g,arr])=>`<optgroup label="${g}">${arr.map(x=>`<option value="${x}"${p.trueClass===x?' selected':''}>${petSpeciesLabel(x)}</option>`).join('')}</optgroup>`).join('');
+ const abilities=PET_ABILITIES.map(x=>({v:x,l:petAbilityLabel(x)}));
+ const fields=[1,2,3,4].map(n=>{
+  const key='petAbility'+n,open=p.level>=unlocked[n-1],val=p[key]||'';
+  const opts=n===1?[{v:fixed,l:petAbilityLabel(fixed)+' (terikat jenis telur)'}]:abilities;
+  return `<div><label>Ability ${n}${n===1?' 🔒':!open?' (terbuka Lv '+unlocked[n-1]+')':''}</label>${petSelect(val,opts,`data-pet="${i}|${key}"`,n===1||!open)}</div>`;
+ }).join('');
+ return `<div class=g>
+ <div><label>Species</label><select data-pet="${i}|trueClass">${species}</select></div>
+ <div><label>Level</label><input type=number min=1 data-pet="${i}|level" value="${p.level||1}"></div>
+ <div><label>Food</label><input type=number min=0 data-pet="${i}|food" value="${p.food||0}"></div>
+ <div><label>Favourite</label><input type=checkbox data-pet="${i}|favourite"${p.favourite?' checked':''}></div>
+ ${fields}</div><p class=m>Ability pertama dikunci mengikuti jenis telur/species. Slot berikutnya terbuka pada level 21, 41, dan 61. Ability tambahan yang belum terbuka tidak dapat diedit.</p>
+ <button class=x data-x=pet- data-v="${i}">Hapus pet</button>`;
+}
+function vPets(){const P=S.d.pets??(S.d.pets=[]);return `<div class=bar><button data-x=pet+>+ Tambah pet</button></div>`+(P.map((p,i)=>`<div class=card><div class=row data-x=pet-tog data-v="${i}"><span><b>${esc(petSpeciesLabel(p.trueClass||'Pet'))}</b><small>Lv ${p.level||1} - id ${p.id}</small></span></div>${S.open===i?petForm(p,i):''}</div>`).join('')||'<p class=m>Belum ada pet.</p>')+`<p class=m>Species dan ability mengikuti struktur save game. Simpan backup sebelum menguji perubahan.</p>`;}
+
 const dirty=()=>{S.dirty=1;st()};
 const st=()=>{const e=$('#st');e.className=S.dirty?'d':'';e.textContent=S.d?(S.fn+(S.dirty?' - ada perubahan belum disimpan':' - tersimpan')+(FSA?'':' (mode unduh)')):'Belum ada file dibuka'};
-const prep=t=>{S.d=JSON.parse(t);S.d.items??=[];S.d.adventurers??=[];S.dirty=0;S.open=-1;S.raw=t;render()};
+const prep=t=>{S.d=JSON.parse(t);S.d.items??=[];S.d.adventurers??=[];S.d.pets??=[];S.dirty=0;S.open=-1;S.raw=t;render()};
 async function load(){await perm(S.fh);const f=await S.fh.getFile();S.fn=f.name;prep(await f.text())}
 async function openMain(){try{if(FSA){[S.fh]=await showOpenFilePicker({id:'igm',types:[{description:'Save JSON',accept:{'application/json':['.json']}}]});kv('fh',S.fh);await load()}else{const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=async()=>{const f=i.files[0];if(f){S.fn=f.name;prep(await f.text())}};i.click()}}catch(e){if(e.name!='AbortError')toast(e.message,1)}}
 const stale=e=>['NotReadableError','NotFoundError','InvalidStateError'].includes(e.name);
@@ -68,17 +106,18 @@ function advForm(a,i){const f=(p,l,v)=>`<div><label>${l}</label>${num(v,`data-a=
 const sl=Object.keys(SL).map(k=>`<div><label>${k}</label>${slotSel(k,a,i)}</div>`).join('');
 const d=a.doctrine||{};const dc=`<div><label>doctrine</label><select data-a="${i}|doctrine.trueClass">${DOC.map(x=>`<option${x==d.trueClass?' selected':''}>${x}</option>`).join('')}</select></div>`+[1,2,3,4,5,6].map(n=>f('doctrine.l'+n,'doctrine l'+n,d['l'+n])).join('');
 const pt=Object.entries(a.potionsDrank||{}).map(([k,v])=>f('potionsDrank.'+k,k.replace('potionOf','').replace('Drank',''),v)).join('');
-return`<div class=g>${f('level','Level',a.level)}${f('experience','Experience',a.experience)}<div><label>class</label>${clsSel(a.trueClass,i)}</div><div><label>ascended</label><input type=checkbox data-a="${i}|ascended"${a.ascended?' checked':''}></div>${sl}${dc}${pt}</div><h3>JSON lanjutan</h3><textarea style="height:140px" data-raw=${i}>${esc(JSON.stringify(a))}</textarea><button class=x data-x=adv- data-v=${i}>Hapus karakter</button>`}
+return`<div class=g>${f('level','Level',a.level)}${f('experience','Experience',a.experience)}<div><label>class</label>${clsSel(a.trueClass,i)}</div><div><label>ascended</label><input type=checkbox data-a="${i}|ascended"${a.ascended?' checked':''}></div>${sl}${dc}<div><label>Trait umum</label>${traitSelect(a,i)}</div>${pt}</div><h3>JSON lanjutan</h3><textarea style="height:140px" data-raw=${i}>${esc(JSON.stringify(a))}</textarea><button class=x data-x=adv- data-v=${i}>Hapus karakter</button>`}
 function vAdv(){const A=S.d.adventurers;return`<div class=bar><button data-x=adv+>+ Tambah karakter</button></div>`+(A.map((a,i)=>`<div class=card><div class=row data-x=tog data-v=${i}><span><b>${esc(nm(a.trueClass))}</b><small>Lv ${a.level} - id ${a.id}</small></span></div>${S.open==i?advForm(a,i):''}</div>`).join('')||'<p class=m>Belum ada karakter di guild.</p>')+'<p class=m>Class dan perlengkapan yang tidak cocok bisa membuat game crash. Uji dulu dengan backup.</p>'}
 function vGuild(){const sk=['money','gems'];return`<div class=bar><input id=q placeholder="Cari pengaturan..." value="${esc(S.q)}"></div><div class=g>`+Object.keys(S.d).filter(k=>!sk.includes(k)&&['number','boolean','string'].includes(typeof S.d[k])&&(!S.q||k.toLowerCase().includes(S.q.toLowerCase()))).sort((a,b)=>(b in MX)-(a in MX)).map(k=>{const v=S.d[k],mx=MX[k];return`<div><label>${k}${mx!=null?` (maks ${mx})`:''}</label>${typeof v=='boolean'?`<input type=checkbox data-p=${k}${v?' checked':''}>`:typeof v=='number'?num(v,`data-p=${k}`+(mx!=null?` data-max=${mx}`:'')):`<input data-p=${k} value="${esc(v)}">`}</div>`}).join('')+'</div><p class=m>Batas maksimum level diambil dari kode game. Kolom upgrade... belum diketahui batasnya.</p>'}
 function vJson(){return`<textarea id=js>${esc(JSON.stringify(S.d,null,1))}</textarea><button data-x=jsa>Terapkan JSON</button>`}
 function render(){$('#nv').innerHTML=TABS.map(([k,l])=>`<button data-x=tab data-v=${k}${S.tab==k?' class=on':''}>${l}</button>`).join('');st();
 if(!S.d){$('#v').innerHTML=`<div class=card><p>Buka <b>idleguild_save.json</b> dari folder Download (hasil tombol Backup di game).</p><button class=p data-x=open>Buka file</button>${S.fh?`<button data-x=resume>Lanjutkan: ${esc(S.fh.name)}</button>`:''}${FSA?'':'<p class=m>Browser ini tidak bisa menimpa file langsung. Pakai Chrome terbaru. Mode unduh: file hasil unduhan bernama baru dan tidak menimpa.</p>'}</div>`;return}
-$('#v').innerHTML={res:vRes,items:vItems,adv:vAdv,guild:vGuild,json:vJson}[S.tab]()}
+$('#v').innerHTML={res:vRes,items:vItems,adv:vAdv,pets:vPets,guild:vGuild,json:vJson}[S.tab]()}
 document.addEventListener('change',e=>{const t=e.target;if(!S.d)return;const v=t.type=='checkbox'?t.checked:t.type=='number'?Math.max(0,Math.min(t.dataset.max!=null?+t.dataset.max:9e15,Math.trunc(+t.value||0))):t.value;
 if(t.dataset.p!=null){setp(S.d,t.dataset.p,v);dirty()}
 else if(t.dataset.i!=null){S.d.items[t.dataset.i].stack=Math.max(1,v);dirty()}
 else if(t.dataset.a!=null){const[i,p]=t.dataset.a.split('|'),a=S.d.adventurers[i];if(t.dataset.slot){v?a[p]={...a[p],stack:1,trueClass:v}:delete a[p]}else setp(a,p,v);dirty();if(p=='trueClass'||p=='level')render()}
+else if(t.dataset.pet!=null){const[i,p]=t.dataset.pet.split('|'),pet=S.d.pets[i],val=t.type==='checkbox'?t.checked:t.type==='number'?Math.max(0,Math.trunc(+t.value||0)):t.value;if(p==='trueClass'){pet.trueClass=val;pet.petAbility1=PET_FIXED[petType(val)];}else pet[p]=val;dirty();if(p==='trueClass'||p==='level')render()}
 else if(t.dataset.all!=null){S.allc=t.checked;render()}
 else if(t.id=='c'){S.cat=v;render()}
 else if(t.dataset.raw!=null){try{S.d.adventurers[t.dataset.raw]=JSON.parse(t.value);dirty();render()}catch(x){toast('JSON tidak valid',1)}}});
@@ -93,9 +132,12 @@ else if(k=='del'){S.d.items.splice(v,1);dirty();render()}
 else if(k=='new'){const n=Math.max(1,Math.trunc(+$('#n_'+v).value||1)),x=S.d.items.find(i=>i.trueClass==v&&Object.keys(i).length==2);x?x.stack+=n:S.d.items.push({stack:n,trueClass:v});dirty();render();toast('Ditambahkan: '+nm(v)+' x'+n)}
 else if(k=='info'){S.det=S.det==v?'':v;render()}
 else if(k=='tog'){S.open=S.open==v?-1:+v;render()}
+else if(k=='pet-tog'){S.open=S.open==v?-1:+v;render()}
+else if(k=='pet+'){const P=S.d.pets??(S.d.pets=[]);const id=Math.max(0,...P.map(p=>+p.id||0))+1;P.push({favourite:false,food:0,id,level:1,petAbility1:'BLOODTHIRSTY',trueClass:'Rat'});S.open=P.length-1;S.tab='pets';dirty();render()}
+else if(k=='pet-'){if(confirm('Hapus pet ini?')){S.d.pets.splice(v,1);S.open=-1;dirty();render()}}
 else if(k=='adv+'){const t=JSON.parse(JSON.stringify(A[0]||(S.d.tavernGuests||[])[0]||{ascended:false,doctrine:{l1:0,l2:0,l3:0,l4:0,l5:0,l6:0,trueClass:'EmptyDoctrine'},experience:0,level:1,potionsDrank:{},seen:false,timeWhenDismissed:0,currentHp:0,currentMana:0,currentShield:0,negativeStatusEffects:[],positiveStatusEffects:[],trueClass:'Footman'}));t.id=Math.max(0,...A.map(a=>a.id))+1;t.level=1;t.experience=0;A.push(t);S.open=A.length-1;dirty();render()}
 else if(k=='adv-'){if(confirm('Hapus karakter ini?')){A.splice(v,1);S.open=-1;dirty();render()}}
-else if(k=='jsa'){try{S.d=JSON.parse($('#js').value);S.d.items??=[];S.d.adventurers??=[];dirty();toast('JSON diterapkan (belum disimpan)')}catch(x){toast('JSON tidak valid: '+x.message,1)}}});
+else if(k=='jsa'){try{S.d=JSON.parse($('#js').value);S.d.items??=[];S.d.adventurers??=[];S.d.pets??=[];dirty();toast('JSON diterapkan (belum disimpan)')}catch(x){toast('JSON tidak valid: '+x.message,1)}}});
 window.addEventListener('beforeunload',e=>{if(S.dirty){e.preventDefault();e.returnValue=''}});
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 (async()=>{S.fh=await kv('fh');S.bh=await kv('bh');render()})();
