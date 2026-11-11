@@ -58,8 +58,33 @@ const PET_LABEL={CURIOUS:'Curious',TEACHER:'Teacher',BLOODTHIRSTY:'Bloodthirsty'
 const petType=c=>Object.keys(PET_SPECIES).find(k=>PET_SPECIES[k].includes(c))||'Wild';
 const petSpeciesLabel=c=>c.replace(/([a-z])([A-Z])/g,'$1 $2');
 const petAbilityLabel=c=>PET_LABEL[c]||c||'-';
+const PET_ABILITY_DESC={
+ CURIOUS:'Chance to roll loot drops twice (+0.3% per pet level).',
+ TEACHER:'Increases party XP gain (+0.4% per pet level).',
+ BLOODTHIRSTY:'Lifesteal: converts damage dealt into HP (+0.15% per pet level).',
+ HEALER:'Heals an ally on allies’ turns (about 0.2 HP per pet level).',
+ SOOTHING:'Allies regenerate HP on their own turns (about 0.4 HP per pet level).',
+ FIGHTER:'Pet attacks during allies’ turns (about 0.5 damage per pet level).',
+ BRIGHT:'Reduces dungeon Darkness effects (0.5 per pet level).',
+ DECOY:'Adds Threat to the pet (+0.01 per pet level); the pet cannot be damaged.',
+ SAVAGE:'Chance for critical damage multiplier to apply twice (+0.3% per pet level).',
+ OPPORTUNIST:'Executes enemies below its HP threshold (+0.2% per pet level).',
+ VIGILANT:'Increases counterattack chance (+0.35% per pet level).',
+ COUNTERATTACK:'Increases counterattack chance (+0.35% per pet level; same effect as Vigilant).',
+ PROTECTIVE:'Blocks incoming damage from any source (0.1 damage per pet level).',
+ BARRIER:'Blocks incoming damage from any source (0.1 damage per pet level; same effect as Protective).',
+ MAGIC:'Chance to apply a random status effect; duration scales with pet level.'
+};
 const petSelect=(value,opts,attr,disabled=false)=>`<select ${attr}${disabled?' disabled':''}>${opts.map(x=>{const v=typeof x==='string'?x:x.v,l=typeof x==='string'?x:x.l;return `<option value="${esc(v)}"${v===value?' selected':''}>${esc(l)}</option>`}).join('')}</select>`;
-function traitSelect(a,i){const opts=[...new Set([...COMMON_TRAITS,a.traitCommon].filter(Boolean))];return petSelect(a.traitCommon,opts.map(x=>({v:x,l:x.replace(/_/g,' ')})),`data-a="${i}|traitCommon"`)}
+const COMMON_TRAIT_DESC={
+ BRUTE:'Constitution +10%; Intelligence -5%; Dexterity -5%.',
+ BRUTE_PLUS:'Constitution +15% (tanpa penalti atribut lain).',
+ BOOKWORM:'Intelligence +10%; Constitution -5%; Dexterity -5%.',
+ BOOKWORM_PLUS:'Intelligence +15% (tanpa penalti atribut lain).',
+ FERAL:'Dexterity +10%; Constitution -5%; Intelligence -5%.',
+ FERAL_PLUS:'Dexterity +15% (tanpa penalti atribut lain).'
+};
+function traitSelect(a,i){const opts=[...new Set([...COMMON_TRAITS,a.traitCommon].filter(Boolean))];return petSelect(a.traitCommon,opts.map(x=>({v:x,l:x.replace(/_/g,' ')})),`data-a="${i}|traitCommon"`)+`<p class=m style="grid-column:1/-1;margin:4px 0">${esc(COMMON_TRAIT_DESC[a.traitCommon]||'Pilih trait untuk melihat efeknya.')}</p>`}
 function petForm(p,i){
  const type=petType(p.trueClass),fixed=PET_FIXED[type],unlocked=[1,21,41,61];
  const species=Object.entries(PET_SPECIES).map(([g,arr])=>`<optgroup label="${g}">${arr.map(x=>`<option value="${x}"${p.trueClass===x?' selected':''}>${petSpeciesLabel(x)}</option>`).join('')}</optgroup>`).join('');
@@ -67,7 +92,7 @@ function petForm(p,i){
  const fields=[1,2,3,4].map(n=>{
   const key='petAbility'+n,open=p.level>=unlocked[n-1],val=p[key]||'';
   const opts=n===1?(PET_FIXED[type]||[fixed]).map(x=>({v:x,l:petAbilityLabel(x)+' (terikat jenis telur)'})):abilities;
-  return `<div><label>Ability ${n}${n===1?' 🔒':!open?' (terbuka Lv '+unlocked[n-1]+')':''}</label>${petSelect(val,opts,`data-pet="${i}|${key}"`,n===1||!open)}</div>`;
+  return `<div><label>Ability ${n}${n===1?' 🔒':!open?' (terbuka Lv '+unlocked[n-1]+')':''}</label>${petSelect(val,opts,`data-pet="${i}|${key}"`,n===1||!open)}<p class=m style="margin:4px 0">${esc(PET_ABILITY_DESC[val]||'Pilih ability untuk melihat efeknya.')}</p></div>`;
  }).join('');
  return `<div class=g>
  <div><label>Species</label><select data-pet="${i}|trueClass">${species}</select></div>
@@ -116,8 +141,8 @@ $('#v').innerHTML={res:vRes,items:vItems,adv:vAdv,pets:vPets,guild:vGuild,json:v
 document.addEventListener('change',e=>{const t=e.target;if(!S.d)return;const v=t.type=='checkbox'?t.checked:t.type=='number'?Math.max(0,Math.min(t.dataset.max!=null?+t.dataset.max:9e15,Math.trunc(+t.value||0))):t.value;
 if(t.dataset.p!=null){setp(S.d,t.dataset.p,v);dirty()}
 else if(t.dataset.i!=null){S.d.items[t.dataset.i].stack=Math.max(1,v);dirty()}
-else if(t.dataset.a!=null){const[i,p]=t.dataset.a.split('|'),a=S.d.adventurers[i];if(t.dataset.slot){v?a[p]={...a[p],stack:1,trueClass:v}:delete a[p]}else setp(a,p,v);dirty();if(p=='trueClass'||p=='level')render()}
-else if(t.dataset.pet!=null){const[i,p]=t.dataset.pet.split('|'),pet=S.d.pets[i],val=t.type==='checkbox'?t.checked:t.type==='number'?Math.max(0,Math.trunc(+t.value||0)):t.value;if(p==='trueClass'){pet.trueClass=val;pet.petAbility1=(PET_FIXED[petType(val)]||['BLOODTHIRSTY'])[0];}else pet[p]=val;dirty();if(p==='trueClass'||p==='level')render()}
+else if(t.dataset.a!=null){const[i,p]=t.dataset.a.split('|'),a=S.d.adventurers[i];if(t.dataset.slot){v?a[p]={...a[p],stack:1,trueClass:v}:delete a[p]}else setp(a,p,v);dirty();if(p=='trueClass'||p=='level'||p=='traitCommon')render()}
+else if(t.dataset.pet!=null){const[i,p]=t.dataset.pet.split('|'),pet=S.d.pets[i],val=t.type==='checkbox'?t.checked:t.type==='number'?Math.max(0,Math.trunc(+t.value||0)):t.value;if(p==='trueClass'){pet.trueClass=val;pet.petAbility1=(PET_FIXED[petType(val)]||['BLOODTHIRSTY'])[0];}else pet[p]=val;dirty();if(p==='trueClass'||p==='level'||p.startsWith('petAbility'))render()}
 else if(t.dataset.all!=null){S.allc=t.checked;render()}
 else if(t.id=='c'){S.cat=v;render()}
 else if(t.dataset.raw!=null){try{S.d.adventurers[t.dataset.raw]=JSON.parse(t.value);dirty();render()}catch(x){toast('JSON tidak valid',1)}}});
