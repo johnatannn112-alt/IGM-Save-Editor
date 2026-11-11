@@ -52,7 +52,7 @@ const PET_SPECIES={
  Construct:['Golem','Rockling','Tesseract'],
  Reptile:['Lizard','Crocodile']
 };
-const PET_FIXED={Wild:'BLOODTHIRSTY',Wooden:'HEALER',Insect:'FIGHTER',Avian:'DECOY',Esoteric:'CURIOUS',Construct:'BRIGHT',Reptile:'OPPORTUNIST'};
+const PET_FIXED={Wild:['BLOODTHIRSTY','VIGILANT'],Wooden:['HEALER','SOOTHING'],Insect:['FIGHTER','PROTECTIVE'],Avian:['DECOY'],Esoteric:['CURIOUS','TEACHER'],Construct:['BRIGHT','MAGIC'],Reptile:['OPPORTUNIST','SAVAGE']};
 const PET_ABILITIES=['CURIOUS','TEACHER','BLOODTHIRSTY','HEALER','SOOTHING','FIGHTER','BRIGHT','DECOY','SAVAGE','OPPORTUNIST','VIGILANT','PROTECTIVE','MAGIC','BARRIER','COUNTERATTACK'];
 const PET_LABEL={CURIOUS:'Curious',TEACHER:'Teacher',BLOODTHIRSTY:'Bloodthirsty',HEALER:'Healer',SOOTHING:'Soothing',FIGHTER:'Fighter',BRIGHT:'Bright',DECOY:'Decoy',SAVAGE:'Savage',OPPORTUNIST:'Opportunist',VIGILANT:'Vigilant',PROTECTIVE:'Protective',MAGIC:'Magic',BARRIER:'Barrier',COUNTERATTACK:'Counterattack'};
 const petType=c=>Object.keys(PET_SPECIES).find(k=>PET_SPECIES[k].includes(c))||'Wild';
@@ -66,7 +66,7 @@ function petForm(p,i){
  const abilities=PET_ABILITIES.map(x=>({v:x,l:petAbilityLabel(x)}));
  const fields=[1,2,3,4].map(n=>{
   const key='petAbility'+n,open=p.level>=unlocked[n-1],val=p[key]||'';
-  const opts=n===1?[{v:fixed,l:petAbilityLabel(fixed)+' (terikat jenis telur)'}]:abilities;
+  const opts=n===1?(PET_FIXED[type]||[fixed]).map(x=>({v:x,l:petAbilityLabel(x)+' (terikat jenis telur)'})):abilities;
   return `<div><label>Ability ${n}${n===1?' 🔒':!open?' (terbuka Lv '+unlocked[n-1]+')':''}</label>${petSelect(val,opts,`data-pet="${i}|${key}"`,n===1||!open)}</div>`;
  }).join('');
  return `<div class=g>
@@ -117,7 +117,7 @@ document.addEventListener('change',e=>{const t=e.target;if(!S.d)return;const v=t
 if(t.dataset.p!=null){setp(S.d,t.dataset.p,v);dirty()}
 else if(t.dataset.i!=null){S.d.items[t.dataset.i].stack=Math.max(1,v);dirty()}
 else if(t.dataset.a!=null){const[i,p]=t.dataset.a.split('|'),a=S.d.adventurers[i];if(t.dataset.slot){v?a[p]={...a[p],stack:1,trueClass:v}:delete a[p]}else setp(a,p,v);dirty();if(p=='trueClass'||p=='level')render()}
-else if(t.dataset.pet!=null){const[i,p]=t.dataset.pet.split('|'),pet=S.d.pets[i],val=t.type==='checkbox'?t.checked:t.type==='number'?Math.max(0,Math.trunc(+t.value||0)):t.value;if(p==='trueClass'){pet.trueClass=val;pet.petAbility1=PET_FIXED[petType(val)];}else pet[p]=val;dirty();if(p==='trueClass'||p==='level')render()}
+else if(t.dataset.pet!=null){const[i,p]=t.dataset.pet.split('|'),pet=S.d.pets[i],val=t.type==='checkbox'?t.checked:t.type==='number'?Math.max(0,Math.trunc(+t.value||0)):t.value;if(p==='trueClass'){pet.trueClass=val;pet.petAbility1=(PET_FIXED[petType(val)]||['BLOODTHIRSTY'])[0];}else pet[p]=val;dirty();if(p==='trueClass'||p==='level')render()}
 else if(t.dataset.all!=null){S.allc=t.checked;render()}
 else if(t.id=='c'){S.cat=v;render()}
 else if(t.dataset.raw!=null){try{S.d.adventurers[t.dataset.raw]=JSON.parse(t.value);dirty();render()}catch(x){toast('JSON tidak valid',1)}}});
@@ -133,7 +133,7 @@ else if(k=='new'){const n=Math.max(1,Math.trunc(+$('#n_'+v).value||1)),x=S.d.ite
 else if(k=='info'){S.det=S.det==v?'':v;render()}
 else if(k=='tog'){S.open=S.open==v?-1:+v;render()}
 else if(k=='pet-tog'){S.open=S.open==v?-1:+v;render()}
-else if(k=='pet+'){const P=S.d.pets??(S.d.pets=[]);const id=Math.max(0,...P.map(p=>+p.id||0))+1;P.push({favourite:false,food:0,id,level:1,petAbility1:'BLOODTHIRSTY',trueClass:'Rat'});S.open=P.length-1;S.tab='pets';dirty();render()}
+else if(k=='pet+'){const P=S.d.pets??(S.d.pets=[]);const id=Math.max(0,...P.map(p=>+p.id||0))+1;P.push({favourite:false,food:0,id,level:1,petAbility1:(PET_FIXED.Wild||['BLOODTHIRSTY'])[0],trueClass:'Rat'});S.open=P.length-1;S.tab='pets';dirty();render()}
 else if(k=='pet-'){if(confirm('Hapus pet ini?')){S.d.pets.splice(v,1);S.open=-1;dirty();render()}}
 else if(k=='adv+'){const t=JSON.parse(JSON.stringify(A[0]||(S.d.tavernGuests||[])[0]||{ascended:false,doctrine:{l1:0,l2:0,l3:0,l4:0,l5:0,l6:0,trueClass:'EmptyDoctrine'},experience:0,level:1,potionsDrank:{},seen:false,timeWhenDismissed:0,currentHp:0,currentMana:0,currentShield:0,negativeStatusEffects:[],positiveStatusEffects:[],trueClass:'Footman'}));t.id=Math.max(0,...A.map(a=>a.id))+1;t.level=1;t.experience=0;A.push(t);S.open=A.length-1;dirty();render()}
 else if(k=='adv-'){if(confirm('Hapus karakter ini?')){A.splice(v,1);S.open=-1;dirty();render()}}
